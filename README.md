@@ -17,6 +17,6 @@ Lemma foo (x : int) : 1 / 2%:R < x -> 0 < x.
 intlia.
 Qed.
 
-File test_lia_tactics displays a few examples.
+File [test_lia_tactics.v](./test_lia_tactics.v) displays a few examples.
 
 This file was originally written by Assia Mahboubi and Thomas Sibut-Pinote, while working on a [proof]( https://hal.inria.fr/hal-00984057) of the irrationality of zeta(3).
