@@ -1,7 +1,11 @@
 Require Import ZArith.
 Require Import Psatz.
 
-Require Import ssreflect ssrfun ssrbool eqtype ssrnat.
+From mathcomp
+Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq path div choice.
+From mathcomp
+Require Import fintype tuple finfun bigop prime finset binomial.
+From mathcomp
 Require Import ssralg ssrnum ssrint rat.
 
 Set Implicit Arguments.
@@ -22,7 +26,7 @@ match n with
 end.
 
 (* Correspondance bewteen comparison relations *)
-Lemma Z_of_intP (n m : int) : n = m <-> Z_of_int n = Z_of_int m.
+Lemma Z_of_intP n m : n = m <-> Z_of_int n = Z_of_int m.
 Proof.
 split; first by move->.
 case: n=> [[|nn]|nn]; case: m => [[|mm]|mm] //=.
@@ -31,57 +35,33 @@ case: n=> [[|nn]|nn]; case: m => [[|mm]|mm] //=.
   by move/Zsucc_inj/inj_eq_rev->.
 Qed.
 
-Lemma Z_of_natP (n m : nat) : n = m <-> Z_of_nat n = Z_of_nat m.
-Proof.
-rewrite -[Z_of_nat n]/(Z_of_int (Posz n)) -[Z_of_nat m]/(Z_of_int (Posz m)).
-by rewrite -Z_of_intP; split; [move-> | case].
-Qed.
-
-Lemma Z_of_intbP (n m : int) : n == m <-> Z_of_int n = Z_of_int m.
+Lemma Z_of_intbP n m : n == m <-> Z_of_int n = Z_of_int m.
 Proof. by rewrite <- Z_of_intP; split; move/eqP. Qed.
 
-Lemma Z_of_natbP (n m : nat) : n == m <-> Z_of_nat n = Z_of_nat m.
-Proof. by rewrite <- Z_of_natP; split; move/eqP. Qed.
-
-Lemma Z_of_intbPn (n m : int) : n != m <-> Z_of_int n <> Z_of_int m.
+Lemma Z_of_intbPn n m : n != m <-> Z_of_int n <> Z_of_int m.
 Proof. by rewrite <- Z_of_intP; split; move/eqP. Qed.
 
-Lemma Z_of_natbPn (n m : nat) : n != m <-> Z_of_nat n <> Z_of_nat m.
-Proof. by rewrite <- Z_of_natP; split; move/eqP. Qed.
-
-Lemma Z_ltP (n m : int) : (n < m) <-> (Zlt (Z_of_int n) (Z_of_int m)).
+Lemma Z_ltP (x y : int) : (x < y) <-> (Zlt (Z_of_int x) (Z_of_int y)).
 Proof.
-split; case: n=> [[|nn]|nn]; case: m => [[|mm]|m] //.
-- move=> h; rewrite /= !Zpos_P_of_succ_nat; apply: Zsucc_lt_compat.
-  apply: inj_lt; exact: ltP.
+split; case: x=> [[|xx]|xx]; case: y => [[|yy]|y] //.
+- move=> h; rewrite /= !Zpos_P_of_succ_nat; apply: Zsucc_lt_compat; apply: inj_lt.
+  exact: ltP.
 - rewrite /Z_of_int; rewrite !NegzE => h.
-  have {h} : (Z_of_nat m.+1 < Z_of_nat nn.+1)%coqZ by apply/inj_lt/ltP.
+  have {h} : (Z_of_nat y.+1 < Z_of_nat xx.+1)%coqZ by apply/inj_lt/ltP.
   by lia.
 - by rewrite /= !Zpos_P_of_succ_nat; move/Zsucc_lt_reg/inj_lt_rev/ltP.
 - rewrite /Z_of_int !NegzE => h.
-- have {h} : (Z_of_nat m.+1 < Z_of_nat nn.+1)%coqZ by lia.
+- have {h} : (Z_of_nat y.+1 < Z_of_nat xx.+1)%coqZ by lia.
   by move/inj_lt_rev/ltP.
 Qed.
 
-Lemma Z_ltnP (n m : nat) : (n < m)%N <-> (Zlt (Z_of_nat n) (Z_of_nat m)).
-Proof.
-rewrite -[Z_of_nat n]/(Z_of_int (Posz n)) -[Z_of_nat m]/(Z_of_int (Posz m)).
-by rewrite -Z_ltP ltez_nat.
-Qed.
-
-Lemma Z_leP (n m : int) : (n <= m) <-> Zle (Z_of_int n) (Z_of_int m).
+Lemma Z_leP (x y : int) : (x <= y) <-> Zle (Z_of_int x) (Z_of_int y).
 Proof.
 split.
 - rewrite ler_eqVlt; case/orP; first by move/eqP->; exact: Zle_refl.
   move/Z_ltP; exact: Zlt_le_weak.
 case/Z_le_lt_eq_dec; first by move/Z_ltP/ltrW.
 by move/Z_of_intP->.
-Qed.
-
-Lemma Z_leqP (n m : nat) : (n <= m)%N <-> Zle (Z_of_nat n) (Z_of_nat m).
-Proof.
-rewrite -[Z_of_nat n]/(Z_of_int (Posz n)) -[Z_of_nat m]/(Z_of_int (Posz m)).
-by rewrite -Z_leP ltez_nat.
 Qed.
 
 (*Transformation of a constraint (x # y) where (x y : int) and # is a comparison
@@ -98,14 +78,12 @@ Ltac zify_int_rel :=
   (* less than *)
   | H : is_true (@Num.Def.ltr _ _ _) |- _ => move/Z_ltP: H => H
   | |- is_true (@Num.Def.ltr _ _ _) => rewrite -> Z_ltP
-  | H : context [  is_true (@Num.Def.ltr _ ?a ?b) ] |- _ =>
-    rewrite -> (Z_ltP a b) in H
+  | H : context [  is_true (@Num.Def.ltr _ ?a ?b) ] |- _ => rewrite -> (Z_ltP a b) in H
   | |- context [ is_true (@Num.Def.ltr _ ?a ?b) ] => rewrite -> (Z_ltP a b)
   (* less or equal *)
   | H : is_true (@Num.Def.ler _ _ _) |- _ => move/Z_leP: H => H
   | |- is_true (@Num.Def.ler _ _ _) => rewrite -> Z_leP
-  | H : context [  is_true (@Num.Def.ler _ ?a ?b) ] |- _ =>
-    rewrite -> (Z_leP a b) in H
+  | H : context [  is_true (@Num.Def.ler _ ?a ?b) ] |- _ => rewrite -> (Z_leP a b) in H
   | |- context [  is_true (@Num.Def.ler _ ?a ?b) ] => rewrite -> (Z_leP a b)
   (* Boolean equality *)
   |H : is_true (@eq_op _  _ _) |- _ => rewrite -> Z_of_intbP in H
@@ -115,8 +93,7 @@ Ltac zify_int_rel :=
   (* Negated boolean equality *)
   |H : is_true (negb (@eq_op _  _ _)) |- _ => rewrite -> Z_of_intbPn in H
   | |- is_true (negb (@eq_op _  _ _)) => rewrite -> Z_of_intbPn
-  |H : context [ is_true (negb (@eq_op _  _ _))] |- _ =>
-   rewrite -> Z_of_intbPn in H
+  |H : context [ is_true (negb (@eq_op _  _ _))] |- _ => rewrite -> Z_of_intbPn in H
   | |- context [ is_true (negb (@eq_op _  _ _))] => rewrite -> Z_of_intbPn
  end.
 
@@ -158,6 +135,7 @@ Qed.
 Lemma Z_of_intmorphN  : {morph Z_of_int : x / - x >-> Zopp x}.
 Proof. by case=> [] [|xx]. Qed.
 
+
 (*Pushing Z_of_int at the leaves of expressions.The transformation is *)
 (*performed on the first such formula found either in the context or *)
 (*the conclusion of the goal *)
@@ -165,39 +143,25 @@ Proof. by case=> [] [|xx]. Qed.
 Ltac zify_int_op :=
  match goal with
   (* add -> Zplus *)
-  | H : context [ Z_of_int (@GRing.add _ _ _) ] |- _ =>
-    rewrite Z_of_intmorphD in H
-  | |- context [ Z_of_int (@GRing.add _ _ _) ] =>
-    rewrite Z_of_intmorphD
+  | H : context [ Z_of_int (@GRing.add _ _ _) ] |- _ => rewrite Z_of_intmorphD in H
+  | |- context [ Z_of_int (@GRing.add _ _ _) ] => rewrite Z_of_intmorphD
   (* opp -> Zopp *)
-  | H : context [ Z_of_int (@GRing.opp _ _) ] |- _ =>
-    rewrite Z_of_intmorphN in H
-  | |- context [ Z_of_int (@GRing.opp _  _) ] =>
-    rewrite Z_of_intmorphN
+  | H : context [ Z_of_int (@GRing.opp _ _) ] |- _ => rewrite Z_of_intmorphN in H
+  | |- context [ Z_of_int (@GRing.opp _  _) ] => rewrite Z_of_intmorphN
   (* mul -> Zmult *)
-  | H : context [ Z_of_int (@GRing.mul _ _ _) ] |- _ =>
-    rewrite Z_of_intmorphM in H
-  | |- context [ Z_of_int (@GRing.mul _ _ _) ] =>
-    rewrite Z_of_intmorphM
+  | H : context [ Z_of_int (@GRing.mul _ _ _) ] |- _ => rewrite Z_of_intmorphM in H
+  | |- context [ Z_of_int (@GRing.mul _ _ _) ] => rewrite Z_of_intmorphM
   (* (* O -> Z0 *) *)
-  | H : context [ Z_of_int (GRing.zero _) ] |- _ =>
-    rewrite [Z_of_int O]/= in H
-  | |- context [ Z_of_int (GRing.zero _) ] =>
-    rewrite [Z_of_int O]/=
+  | H : context [ Z_of_int (GRing.zero _) ] |- _ => rewrite [Z_of_int O]/= in H
+  | |- context [ Z_of_int (GRing.zero _) ] => rewrite [Z_of_int O]/=
   (* (* 1 -> 1 *) *)
-  | H : context [ Z_of_int (GRing.one _) ] |- _ =>
-    rewrite [Z_of_int 1]/= in H
-  | |- context [ Z_of_int (GRing.one _) ] =>
-    rewrite [Z_of_int 1]/=
+  | H : context [ Z_of_int (GRing.one _) ] |- _ => rewrite [Z_of_int 1]/= in H
+  | |- context [ Z_of_int (GRing.one _) ] => rewrite [Z_of_int 1]/=
   (* (* n -> n *) *)
-  | H : context [ Z_of_int _ ] |- _ =>
-    rewrite [Z_of_int (S _)]/= in H
-  | |- context [ Z_of_int _ ] =>
-    rewrite [Z_of_int (S _)]/=
-  | H : context [ Z_of_nat _ ] |- _ =>
-    rewrite [Z_of_nat 0]/= [Z_of_nat (S _)]/= in H
-  | |- context [ Z_of_nat _ ] =>
-    rewrite [Z_of_nat 0]/= [Z_of_nat (S _)]/=
+  | H : context [ Z_of_int _ ] |- _ => rewrite [Z_of_int (S _)]/= in H
+  | |- context [ Z_of_int _ ] => rewrite [Z_of_int (S _)]/=
+  | H : context [ Z_of_nat _ ] |- _ => rewrite [Z_of_nat 0]/= [Z_of_nat (S _)]/= in H
+  | |- context [ Z_of_nat _ ] => rewrite [Z_of_nat 0]/= [Z_of_nat (S _)]/=
  end.
 
 (* Preparing a goal to be solved by lia by translating every formula *)
@@ -207,6 +171,8 @@ Ltac zify_int :=
   repeat progress zify_int_rel;
   repeat progress zify_int_op.
 
+(* Preprocessing + lia *)
+Ltac intlia := zify_int; lia.
 
 (* Below starts the code of goal_to_lia, to be cleaned as well *)
 
@@ -215,13 +181,6 @@ Lemma eqr_int_prop (x y : int) :
 Proof.
 split; last by move ->.
 by move/eqP; rewrite eqr_int; move/eqP.
-Qed.
-
-Lemma eqr_nat_prop (x y : nat) :
- (x%:R = y%:R :> rat) <-> x = y.
-Proof.
-split; last by move ->.
-by move/eqP; rewrite eqr_nat; move/eqP.
 Qed.
 
 
@@ -255,19 +214,13 @@ rewrite ?NegzE;
 (* propositions of the form _%:~R =/<=/< _%:~R *)
 rewrite -?(rmorphD,rmorphN, rmorphB,rmorphM);
 (* get rid of the cast %:~R around various compare operations *)
-rewrite ?(eqr_int,ler_int, ltr_int, eqr_int_prop);
-rewrite ?(eqr_nat,ler_nat, ltr_nat, eqr_nat_prop);
+rewrite ?(eqr_int,ler_int, ltr_int, eqr_int_prop); (* TODO: add nats here *)
 (* put Z_of_int around the sides of the operation =,<=,or < (on ints)  *)
 try (rewrite -> !Z_of_intbPn);
 try (rewrite -> !Z_of_intbP);
 try (rewrite -> !Z_ltP);
 try (rewrite -> !Z_leP);
-try (rewrite -> !Z_of_intP);
-try (rewrite -> !Z_of_natbPn);
-try (rewrite -> !Z_of_natbP);
-try (rewrite -> !Z_ltnP);
-try (rewrite -> !Z_leqP);
-try (rewrite -> !Z_of_natP);
+try (rewrite -> !Z_of_intP); (* TODO: add nats here *)
 (* just in case there were some trapped nats inside the goal *)
 rewrite ?(PoszD,PoszM);
 (* distribute Z_of_int to the leaves of the arithmetic expressions *)
@@ -276,6 +229,3 @@ rewrite ?(Z_of_intmorphN, Z_of_intmorphM, Z_of_intmorphD)
 (* somehow we obtain (is_true true) somewhere and lia dislikes it *)
 repeat (rewrite [true](erefl : true = (0 < (1 : int))));
 repeat (rewrite [false](erefl : false = (0 < (0 : int)))).
-
-(* Preprocessing + lia *)
-Ltac intlia := goal_to_lia; zify_int; lia.
